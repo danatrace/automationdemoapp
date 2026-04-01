@@ -49,16 +49,33 @@ Demo login:
 
 ```bash
 docker build -t ghcr.io/danatrace/automationdemoapp:latest .
-docker run --rm -p 3000:3000 ghcr.io/danatrace/automationdemoapp:latest
+export SESSION_SECRET="$(openssl rand -hex 32)"
+docker run --rm -p 3000:3000 \
+	-e NODE_ENV=production \
+	-e SESSION_SECRET="$SESSION_SECRET" \
+	ghcr.io/danatrace/automationdemoapp:latest
 ```
+
+The container image runs with `NODE_ENV=production`, so `SESSION_SECRET` must be set.
 
 ## Kubernetes deploy
 
-Update the image reference in `k8s/banking-observability-demo.yaml` if needed, then apply:
+1. Update the image reference in `k8s/banking-observability-demo.yaml` if needed.
+2. Set a real value for `SESSION_SECRET` in `k8s/banking-observability-demo.yaml` (replace `replace-with-a-long-random-secret`).
+3. Apply the manifest and wait for rollout:
 
 ```bash
 kubectl apply -f k8s/banking-observability-demo.yaml
+kubectl -n banking-demo rollout status deployment/banking-observability-demo
 kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
+```
+
+If rollout does not complete, check:
+
+```bash
+kubectl -n banking-demo get pods
+kubectl -n banking-demo describe pod <pod-name>
+kubectl -n banking-demo logs deploy/banking-observability-demo
 ```
 
 ## Observability notes

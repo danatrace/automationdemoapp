@@ -18,6 +18,15 @@ const elements = {
   toast: document.querySelector('#toast')
 };
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'same-origin',
@@ -101,16 +110,20 @@ function renderTransactions(account) {
 
   elements.transactionList.innerHTML = account.transactions
     .map(
-      (transaction) => `
+      (transaction) => {
+        const safeDescription = escapeHtml(transaction.description);
+        const safeType = escapeHtml(transaction.type);
+        return `
         <article class="list-item">
           <header>
-            <strong>${transaction.description}</strong>
-            <span class="pill ${transaction.type}">${transaction.type}</span>
+            <strong>${safeDescription}</strong>
+            <span class="pill ${safeType}">${safeType}</span>
           </header>
           <p>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transaction.amount)}</p>
           <small>${new Date(transaction.createdAt).toLocaleString()}</small>
         </article>
-      `
+      `;
+      }
     )
     .join('');
 }
@@ -118,19 +131,23 @@ function renderTransactions(account) {
 function renderStocks(stocks, asOf) {
   elements.stocksGrid.innerHTML = stocks
     .map(
-      (stock) => `
+      (stock) => {
+        const safeSymbol = escapeHtml(stock.symbol);
+        const safeCompany = escapeHtml(stock.company);
+        return `
         <article class="stock-card">
           <header>
             <div>
-              <strong>${stock.symbol}</strong>
-              <div class="stock-meta">${stock.company}</div>
+              <strong>${safeSymbol}</strong>
+              <div class="stock-meta">${safeCompany}</div>
             </div>
             <span class="pill ${stock.change >= 0 ? 'up' : 'down'}">${stock.change >= 0 ? '+' : ''}${stock.change}%</span>
           </header>
           <p>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(stock.price)}</p>
           <small>${new Date(asOf).toLocaleString()}</small>
         </article>
-      `
+      `;
+      }
     )
     .join('');
 }

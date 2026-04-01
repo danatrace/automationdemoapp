@@ -3,6 +3,15 @@ kind: Namespace
 metadata:
   name: banking-demo
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: banking-observability-demo-secrets
+  namespace: banking-demo
+type: Opaque
+stringData:
+  SESSION_SECRET: replace-with-a-long-random-secret
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,10 +29,21 @@ spec:
       labels:
         app: banking-observability-demo
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: banking-observability-demo
           image: ghcr.io/danatrace/automationdemoapp:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 3000
               name: http
@@ -33,7 +53,10 @@ spec:
             - name: PORT
               value: "3000"
             - name: SESSION_SECRET
-              value: banking-demo-session-secret
+              valueFrom:
+                secretKeyRef:
+                  name: banking-observability-demo-secrets
+                  key: SESSION_SECRET
           resources:
             requests:
               cpu: "250m"

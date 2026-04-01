@@ -8,6 +8,17 @@ This application is currently being tested and is provided for demonstration and
 
 Use of this application is at your own risk. The software is provided "as is" without warranties of any kind.
 
+## Security Notice
+
+This demo is intentionally built for observability and chaos testing, not for production banking workloads.
+
+Before exposing this app publicly, set strong environment values:
+
+- `SESSION_SECRET`: required in production. Use a long random value.
+- `METRICS_TOKEN`: optional but recommended to protect `/metrics` with a bearer token.
+- `AUTH_RATE_LIMIT_MAX`: optional auth request cap per 15-minute window (default `20`).
+- `CHAOS_RATE_LIMIT_MAX`: optional chaos/load request cap per minute (default `30`).
+
 ## Features
 
 - Simulated banking UI with login, signup, account balance, and transactions.

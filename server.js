@@ -1,5 +1,8 @@
 const express = require('express');
 const session = require('express-session');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const pinoHttp = require('pino-http');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./src/logger');
@@ -19,24 +22,79 @@ const {
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const isProduction = process.env.NODE_ENV === 'production';
+const configuredSessionSecret = process.env.SESSION_SECRET;
+if (!configuredSessionSecret && isProduction) {
+  throw new Error('SESSION_SECRET environment variable is required in production');
+}
+const sessionSecret = configuredSessionSecret || crypto.randomBytes(32).toString('hex');
+
+if (!configuredSessionSecret) {
+  logger.warn(
+    { event: 'security.session_secret.ephemeral' },
+    'SESSION_SECRET not set; using ephemeral secret for this process'
+  );
+}
+
 const chaosManager = new ChaosManager({ logger, gauges: metrics.gauges });
 const loadGenerator = new LoadGenerator({ logger });
 
-app.use(express.json());
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"]
+      }
+    }
+  })
+);
+app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: false }));
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' }
+});
+
+const chaosRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.CHAOS_RATE_LIMIT_MAX || 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many control requests. Please slow down.' }
+});
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'banking-demo-session-secret',
+    secret: sessionSecret,
+    name: 'banking.sid',
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: false,
+      secure: isProduction,
       maxAge: 1000 * 60 * 60 * 8
     }
   })
 );
+
+app.use('/api/auth/login', authRateLimiter);
+app.use('/api/auth/signup', authRateLimiter);
+app.use('/api/chaos', chaosRateLimiter);
+app.use('/api/load', chaosRateLimiter);
 
 app.use(
   pinoHttp({
@@ -131,6 +189,14 @@ app.get('/readyz', (req, res) => {
 });
 
 app.get('/metrics', async (req, res) => {
+  const expectedMetricsToken = process.env.METRICS_TOKEN;
+  if (expectedMetricsToken) {
+    const token = (req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (token !== expectedMetricsToken) {
+      return res.status(401).json({ error: 'Unauthorized metrics access' });
+    }
+  }
+
   res.set('Content-Type', metrics.client.register.contentType);
   res.end(await metrics.client.register.metrics());
 });
@@ -151,6 +217,11 @@ app.post('/api/auth/signup', (req, res) => {
     return res.status(400).json({ error: 'username, password and fullName are required' });
   }
 
+  if (String(username).length > 64 || String(fullName).length > 128 || String(password).length < 8) {
+    req.log.warn({ event: 'auth.signup.invalid_constraints' }, 'Signup payload failed constraints');
+    return res.status(400).json({ error: 'Invalid signup values or password too short' });
+  }
+
   if (getUserByUsername(username)) {
     req.log.warn({ event: 'auth.signup.conflict', username }, 'Signup rejected because username exists');
     return res.status(409).json({ error: 'Username already exists' });
@@ -166,6 +237,10 @@ app.post('/api/auth/signup', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   req.log.info({ event: 'auth.login.request', username }, 'Login requested');
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required' });
+  }
 
   const user = getUserByUsername(username);
   if (!user || !verifyPassword(password, user.passwordHash)) {

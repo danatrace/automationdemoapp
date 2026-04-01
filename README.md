@@ -2,6 +2,12 @@
 
 JavaScript observability and remediation demo application for containers and Kubernetes.
 
+## Notice
+
+This application is currently being tested and is provided for demonstration and evaluation purposes.
+
+Use of this application is at your own risk. The software is provided "as is" without warranties of any kind.
+
 ## Features
 
 - Simulated banking UI with login, signup, account balance, and transactions.
@@ -70,3 +76,7 @@ kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
 - `POST /api/load/start`: start load generator with concurrent users. Body: `{ "userCount": 1 }` (1-100000, clamped).
 - `POST /api/load/stop`: stop load generator and reset state.
 - Each virtual user fires randomized requests to `/api/account`, `/api/stocks`, and `/api/transactions` every 2-5 seconds.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

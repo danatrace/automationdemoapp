@@ -60,36 +60,58 @@ The container image runs with `NODE_ENV=production`, so `SESSION_SECRET` must be
 
 ## Kubernetes deploy
 
-1. Make sure the image in `k8s/banking-observability-demo.yaml` is pullable by your cluster.
+> **The manifest does not ship a pre-built image.** You must build and push the image yourself before applying.
 
-	Option A: push to your own registry and update the image value.
+### Step 1 — build and push the image
 
-	```bash
-	docker build -t ghcr.io/<your-github-username>/automationdemoapp:latest .
-	echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-username> --password-stdin
-	docker push ghcr.io/<your-github-username>/automationdemoapp:latest
-	```
+**Option A — push to GitHub Container Registry (GHCR) under your own account**
 
-	Your token must include `write:packages` (and usually `read:packages`).
-	You cannot push to `ghcr.io/danatrace/...` unless that org/user granted you permission.
+```bash
+export GITHUB_USER=<your-github-username>
+docker build -t ghcr.io/$GITHUB_USER/automationdemoapp:latest .
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u $GITHUB_USER --password-stdin
+docker push ghcr.io/$GITHUB_USER/automationdemoapp:latest
+```
 
-	Option B (local cluster): build locally and load into the cluster runtime.
+Your Personal Access Token (classic) or fine-grained token must have **`write:packages`** scope.
+You cannot push to `ghcr.io/danatrace/...` unless that org granted you permission — use your own namespace.
 
-	```bash
-	docker build -t automationdemoapp:local .
-	# kind example:
-	kind load docker-image automationdemoapp:local
-	```
+**Option B — local cluster (kind / minikube / k3d)**
 
-	Then set the deployment image to `automationdemoapp:local`.
-2. Set a real value for `SESSION_SECRET` in `k8s/banking-observability-demo.yaml` (replace `replace-with-a-long-random-secret`).
-3. Apply the manifest and wait for rollout:
+```bash
+docker build -t automationdemoapp:local .
+# kind:
+kind load docker-image automationdemoapp:local
+# minikube:
+minikube image load automationdemoapp:local
+# k3d:
+k3d image import automationdemoapp:local
+```
+
+Then use `automationdemoapp:local` as the image name in the next step.
+
+### Step 2 — update the manifest image and secret
+
+Replace the placeholder image value:
+
+```bash
+# GHCR example:
+sed -i 's|YOUR_REGISTRY/automationdemoapp:latest|ghcr.io/<your-github-username>/automationdemoapp:latest|' k8s/banking-observability-demo.yaml
+# Local cluster example:
+sed -i 's|YOUR_REGISTRY/automationdemoapp:latest|automationdemoapp:local|' k8s/banking-observability-demo.yaml
+```
+
+Also set a real `SESSION_SECRET` value in `k8s/banking-observability-demo.yaml` (replace `replace-with-a-long-random-secret`).
+
+### Step 3 — apply and verify
 
 ```bash
 kubectl apply -f k8s/banking-observability-demo.yaml
 kubectl -n banking-demo rollout status deployment/banking-observability-demo
 kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
 ```
+
+Open `http://localhost:3000`.
 
 If rollout does not complete, check:
 

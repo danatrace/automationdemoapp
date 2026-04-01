@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banking Observability Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Observability Lab</p>
+          <h1>Banking Control Room</h1>
+          <p class="sidebar-copy">Simulated banking flows, market data, and controlled failures for tracing and remediation demos.</p>
+        </div>
+        <nav id="nav" class="nav hidden">
+          <button data-view="transactions" class="nav-link active">Transactions</button>
+          <button data-view="stocks" class="nav-link">Stocks</button>
+          <button data-view="chaos" class="nav-link danger">Disaster Activation</button>
+        </nav>
+        <div class="sidebar-footer">
+          <p id="sessionSummary">Not authenticated</p>
+          <button id="logoutButton" class="secondary hidden">Log out</button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section id="authView" class="panel auth-grid">
+          <div class="panel-card">
+            <p class="eyebrow">Login</p>
+            <h2>Access demo account</h2>
+            <form id="loginForm" class="stack-form">
+              <label>
+                Username
+                <input type="text" name="username" value="demo" required />
+              </label>
+              <label>
+                Password
+                <input type="password" name="password" value="demo123" required />
+              </label>
+              <button type="submit">Log in</button>
+            </form>
+            <p class="small-print">Preloaded demo credentials: demo / demo123</p>
+          </div>
+
+          <div class="panel-card">
+            <p class="eyebrow">Signup</p>
+            <h2>Create simulated user</h2>
+            <form id="signupForm" class="stack-form">
+              <label>
+                Full name
+                <input type="text" name="fullName" required />
+              </label>
+              <label>
+                Username
+                <input type="text" name="username" required />
+              </label>
+              <label>
+                Password
+                <input type="password" name="password" required />
+              </label>
+              <button type="submit">Sign up</button>
+            </form>
+          </div>
+        </section>
+
+        <section id="transactionsView" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Banking</p>
+              <h2>Transactions</h2>
+            </div>
+            <div class="balance-card">
+              <span>Current balance</span>
+              <strong id="balanceAmount">$0.00</strong>
+            </div>
+          </div>
+
+          <div class="transactions-grid">
+            <div class="panel-card">
+              <h3>Create transaction</h3>
+              <form id="transactionForm" class="stack-form">
+                <label>
+                  Type
+                  <select name="type">
+                    <option value="credit">Credit</option>
+                    <option value="debit">Debit</option>
+                  </select>
+                </label>
+                <label>
+                  Amount
+                  <input type="number" name="amount" min="1" step="0.01" required />
+                </label>
+                <label>
+                  Description
+                  <input type="text" name="description" required />
+                </label>
+                <button type="submit">Submit transaction</button>
+              </form>
+            </div>
+
+            <div class="panel-card">
+              <h3>Recent activity</h3>
+              <div id="transactionList" class="list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="stocksView" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Markets</p>
+              <h2>Simulated stocks</h2>
+            </div>
+            <button id="refreshStocksButton" class="secondary">Refresh stocks</button>
+          </div>
+          <div id="stocksGrid" class="stocks-grid"></div>
+        </section>
+
+        <section id="chaosView" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Disaster Activation</p>
+              <h2>Chaos and remediation</h2>
+            </div>
+            <button id="remediateButton" class="secondary">Remediate all</button>
+          </div>
+
+          <div class="chaos-grid">
+            <article class="panel-card chaos-card">
+              <h3>Fast CPU saturation</h3>
+              <p>Spawns multiple CPU-burning workers immediately to saturate cluster CPU fast.</p>
+              <button id="saturationButton" class="danger">Activate saturation</button>
+            </article>
+            <article class="panel-card chaos-card">
+              <h3>Slow CPU ramp</h3>
+              <p>Gradually adds more worker load over time to simulate creeping CPU pressure.</p>
+              <button id="rampButton" class="warning">Activate ramp</button>
+            </article>
+            <article class="panel-card chaos-card">
+              <h3>Error injection</h3>
+              <p>Forces application endpoints to intermittently fail with server errors.</p>
+              <button id="errorsButton" class="warning">Activate errors</button>
+            </article>
+          </div>
+
+          <div class="panel-card">
+            <h3>Current chaos status</h3>
+            <pre id="chaosStatus" class="status-block">Loading status...</pre>
+          </div>
+        </section>
+
+        <div id="toast" class="toast hidden"></div>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+  </html>

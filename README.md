@@ -60,7 +60,24 @@ The container image runs with `NODE_ENV=production`, so `SESSION_SECRET` must be
 
 ## Kubernetes deploy
 
-1. Update the image reference in `k8s/banking-observability-demo.yaml` if needed.
+1. Make sure the image in `k8s/banking-observability-demo.yaml` is pullable by your cluster.
+
+	Option A: push to your own registry and update the image value.
+
+	```bash
+	docker build -t <your-registry>/automationdemoapp:latest .
+	docker push <your-registry>/automationdemoapp:latest
+	```
+
+	Option B (local cluster): build locally and load into the cluster runtime.
+
+	```bash
+	docker build -t automationdemoapp:local .
+	# kind example:
+	kind load docker-image automationdemoapp:local
+	```
+
+	Then set the deployment image to `automationdemoapp:local`.
 2. Set a real value for `SESSION_SECRET` in `k8s/banking-observability-demo.yaml` (replace `replace-with-a-long-random-secret`).
 3. Apply the manifest and wait for rollout:
 
@@ -77,6 +94,18 @@ kubectl -n banking-demo get pods
 kubectl -n banking-demo describe pod <pod-name>
 kubectl -n banking-demo logs deploy/banking-observability-demo
 ```
+
+For `ImagePullBackOff`, inspect pull events first:
+
+```bash
+kubectl -n banking-demo describe pod <pod-name> | sed -n '/Events:/,$p'
+```
+
+Common causes:
+
+- image name/tag does not exist
+- private registry without `imagePullSecrets`
+- local image not loaded into the cluster runtime
 
 ## Observability notes
 

@@ -63,3 +63,10 @@ kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
 - `POST /api/chaos/:mode`: generic activation endpoint where `:mode` is `saturation`, `ramp`, or `errors`.
 - `DELETE /api/chaos/:mode`: generic deactivation endpoint.
 - `POST /api/chaos/remediate`: deactivate all chaos modes at once.
+
+## Load Generator API
+
+- `GET /api/load/status`: current load generator state (active, userCount, requestsGenerated, startedAt).
+- `POST /api/load/start`: start load generator with concurrent users. Body: `{ "userCount": 1 }` (1-100000, clamped).
+- `POST /api/load/stop`: stop load generator and reset state.
+- Each virtual user fires randomized requests to `/api/account`, `/api/stocks`, and `/api/transactions` every 2-5 seconds.

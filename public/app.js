@@ -155,7 +155,7 @@ async function initializeSession() {
   const payload = await api('/api/auth/session');
   setAuthenticated(payload.user);
   if (payload.user) {
-    await Promise.all([refreshAccount(), refreshStocks(), refreshChaosStatus()]);
+    await Promise.all([refreshAccount(), refreshStocks(), refreshChaosStatus(), updateLoadGeneratorButtonStates()]);
   }
 }
 
@@ -255,6 +255,20 @@ async function updateChaosButtonStates() {
   });
 }
 
+async function updateLoadGeneratorButtonStates() {
+  const status = await api('/api/load/status');
+  const startBtn = document.querySelector('#loadStartButton');
+  const stopBtn = document.querySelector('#loadStopButton');
+
+  if (status.active) {
+    startBtn.classList.add('hidden');
+    stopBtn.classList.remove('hidden');
+  } else {
+    startBtn.classList.remove('hidden');
+    stopBtn.classList.add('hidden');
+  }
+}
+
 document.querySelector('#saturationActivateButton').addEventListener('click', async () => {
   try {
     await api('/api/chaos/saturation', { method: 'POST' });
@@ -327,6 +341,29 @@ document.querySelector('#errorsDeactivateButton').addEventListener('click', asyn
   }
 });
 
+document.querySelector('#loadStartButton').addEventListener('click', async () => {
+  try {
+    const userCount = Number(document.querySelector('#userCountInput').value) || 10;
+    await api('/api/load/start', { method: 'POST', body: JSON.stringify({ userCount }) });
+    await updateLoadGeneratorButtonStates();
+    await logClientEvent('load.start', 'Load generator started', { userCount });
+    showToast(`Load generator started with ${userCount} concurrent users`);
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
+document.querySelector('#loadStopButton').addEventListener('click', async () => {
+  try {
+    await api('/api/load/stop', { method: 'POST' });
+    await updateLoadGeneratorButtonStates();
+    await logClientEvent('load.stop', 'Load generator stopped');
+    showToast('Load generator stopped');
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
 elements.logoutButton.addEventListener('click', async () => {
   try {
     await api('/api/auth/logout', { method: 'POST' });
@@ -345,7 +382,7 @@ document.querySelectorAll('.nav-link').forEach((button) => {
       await refreshStocks().catch(() => {});
     }
     if (button.dataset.view === 'chaos') {
-      await refreshChaosStatus().catch(() => {});
+      await Promise.all([refreshChaosStatus(), updateLoadGeneratorButtonStates()]).catch(() => {});
     }
   });
 });

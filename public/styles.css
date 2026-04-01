@@ -260,6 +260,26 @@ select {
   width: 100%;
 }
 
+.load-control {
+  display: grid;
+  gap: 12px;
+}
+
+.load-control label {
+  display: grid;
+  gap: 8px;
+}
+
+.load-control input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 13px 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.95rem;
+}
+
 .toast {
   position: fixed;
   right: 24px;

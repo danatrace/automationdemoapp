@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('./src/logger');
 const metrics = require('./src/metrics');
 const ChaosManager = require('./src/chaosManager');
+const LoadGenerator = require('./src/loadGenerator');
 const { verifyPassword } = require('./src/auth');
 const {
   createUser,
@@ -19,6 +20,7 @@ const {
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const chaosManager = new ChaosManager({ logger, gauges: metrics.gauges });
+const loadGenerator = new LoadGenerator({ logger });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -321,6 +323,28 @@ app.delete('/api/chaos/:mode', requireAuth, parseChaosMode, (req, res) => {
   res.json({ mode: req.chaosMode, action: 'deactivated', status });
 });
 
+app.get('/api/load/status', requireAuth, (req, res) => {
+  const status = loadGenerator.getStatus();
+  req.log.info({ event: 'load.status.view', userId: req.user.id, status }, 'Load generator status returned');
+  res.json(status);
+});
+
+app.post('/api/load/start', requireAuth, (req, res) => {
+  const { userCount = 1 } = req.body || {};
+  const status = loadGenerator.start(userCount);
+  req.log.warn(
+    { event: 'load.start.triggered', userId: req.user.id, userCount, status },
+    'Load generator started through REST API'
+  );
+  res.json({ action: 'started', status });
+});
+
+app.post('/api/load/stop', requireAuth, (req, res) => {
+  const status = loadGenerator.stop();
+  req.log.info({ event: 'load.stop.triggered', userId: req.user.id, status }, 'Load generator stopped through REST API');
+  res.json({ action: 'stopped', status });
+});
+
 app.use(express.static('public'));
 
 app.use((error, req, res, next) => {
@@ -335,6 +359,7 @@ const server = app.listen(port, () => {
 function shutdown(signal) {
   logger.warn({ event: 'server.shutdown', signal }, 'Shutdown signal received');
   chaosManager.shutdown();
+  loadGenerator.shutdown();
   server.close(() => {
     logger.info({ event: 'server.stopped' }, 'Server stopped cleanly');
     process.exit(0);

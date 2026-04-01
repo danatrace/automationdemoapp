@@ -250,6 +250,16 @@ select {
   overflow-x: auto;
 }
 
+.chaos-button-group {
+  display: grid;
+  gap: 10px;
+}
+
+.chaos-activate-btn,
+.chaos-deactivate-btn {
+  width: 100%;
+}
+
 .toast {
   position: fixed;
   right: 24px;

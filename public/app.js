@@ -148,6 +148,7 @@ async function refreshStocks() {
 async function refreshChaosStatus() {
   const status = await api('/api/chaos/status');
   elements.chaosStatus.textContent = JSON.stringify(status, null, 2);
+  await updateChaosButtonStates();
 }
 
 async function initializeSession() {
@@ -231,10 +232,34 @@ document.querySelector('#refreshStocksButton').addEventListener('click', async (
   }
 });
 
-document.querySelector('#saturationButton').addEventListener('click', async () => {
+async function updateChaosButtonStates() {
+  const status = await api('/api/chaos/status');
+  const buttons = {
+    saturation: { activate: 'saturationActivateButton', deactivate: 'saturationDeactivateButton' },
+    ramp: { activate: 'rampActivateButton', deactivate: 'rampDeactivateButton' },
+    errors: { activate: 'errorsActivateButton', deactivate: 'errorsDeactivateButton' }
+  };
+
+  Object.entries(buttons).forEach(([mode, ids]) => {
+    const isActive = mode === 'saturation' ? status.saturation : mode === 'ramp' ? status.ramp : status.errorInjection;
+    const activateBtn = document.querySelector(`#${ids.activate}`);
+    const deactivateBtn = document.querySelector(`#${ids.deactivate}`);
+
+    if (isActive) {
+      activateBtn.classList.add('hidden');
+      deactivateBtn.classList.remove('hidden');
+    } else {
+      activateBtn.classList.remove('hidden');
+      deactivateBtn.classList.add('hidden');
+    }
+  });
+}
+
+document.querySelector('#saturationActivateButton').addEventListener('click', async () => {
   try {
     await api('/api/chaos/saturation', { method: 'POST' });
     await refreshChaosStatus();
+    await updateChaosButtonStates();
     await logClientEvent('chaos.saturation.trigger', 'Immediate CPU saturation activated');
     showToast('Immediate CPU saturation activated');
   } catch (error) {
@@ -242,10 +267,23 @@ document.querySelector('#saturationButton').addEventListener('click', async () =
   }
 });
 
-document.querySelector('#rampButton').addEventListener('click', async () => {
+document.querySelector('#saturationDeactivateButton').addEventListener('click', async () => {
+  try {
+    await api('/api/chaos/saturation', { method: 'DELETE' });
+    await refreshChaosStatus();
+    await updateChaosButtonStates();
+    await logClientEvent('chaos.saturation.deactivate', 'Immediate CPU saturation deactivated');
+    showToast('Immediate CPU saturation deactivated');
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
+document.querySelector('#rampActivateButton').addEventListener('click', async () => {
   try {
     await api('/api/chaos/ramp', { method: 'POST' });
     await refreshChaosStatus();
+    await updateChaosButtonStates();
     await logClientEvent('chaos.ramp.trigger', 'Slow CPU ramp activated');
     showToast('Slow CPU ramp activated');
   } catch (error) {
@@ -253,10 +291,23 @@ document.querySelector('#rampButton').addEventListener('click', async () => {
   }
 });
 
-document.querySelector('#errorsButton').addEventListener('click', async () => {
+document.querySelector('#rampDeactivateButton').addEventListener('click', async () => {
+  try {
+    await api('/api/chaos/ramp', { method: 'DELETE' });
+    await refreshChaosStatus();
+    await updateChaosButtonStates();
+    await logClientEvent('chaos.ramp.deactivate', 'Slow CPU ramp deactivated');
+    showToast('Slow CPU ramp deactivated');
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
+document.querySelector('#errorsActivateButton').addEventListener('click', async () => {
   try {
     await api('/api/chaos/errors', { method: 'POST' });
     await refreshChaosStatus();
+    await updateChaosButtonStates();
     await logClientEvent('chaos.errors.trigger', 'Error injection activated');
     showToast('Error injection activated');
   } catch (error) {
@@ -264,12 +315,13 @@ document.querySelector('#errorsButton').addEventListener('click', async () => {
   }
 });
 
-document.querySelector('#remediateButton').addEventListener('click', async () => {
+document.querySelector('#errorsDeactivateButton').addEventListener('click', async () => {
   try {
-    await api('/api/chaos/remediate', { method: 'POST' });
+    await api('/api/chaos/errors', { method: 'DELETE' });
     await refreshChaosStatus();
-    await logClientEvent('chaos.remediation.trigger', 'Chaos remediated');
-    showToast('Remediation completed');
+    await updateChaosButtonStates();
+    await logClientEvent('chaos.errors.deactivate', 'Error injection deactivated');
+    showToast('Error injection deactivated');
   } catch (error) {
     showToast(error.message, true);
   }

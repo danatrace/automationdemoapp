@@ -18,8 +18,16 @@ class ChaosManager {
     this.rampInterval = null;
   }
 
+  static get VALID_MODES() {
+    return ['saturation', 'ramp', 'errors'];
+  }
+
   getStatus() {
     return { ...this.state };
+  }
+
+  isValidMode(mode) {
+    return ChaosManager.VALID_MODES.includes(mode);
   }
 
   activateSaturation() {
@@ -34,7 +42,7 @@ class ChaosManager {
 
     const targetWorkers = Math.max(2, os.cpus().length * 2);
     for (let index = 0; index < targetWorkers; index += 1) {
-      this.spawnWorker(200000);
+      this.spawnWorker('saturation', 200000);
     }
 
     return this.getStatus();
@@ -50,19 +58,19 @@ class ChaosManager {
     this.state.lastActionAt = new Date().toISOString();
     this.gauges.chaosModeGauge.set({ mode: 'ramp' }, 1);
 
-    this.spawnWorker(70000);
+    this.spawnWorker('ramp', 70000);
     let burst = 90000;
     this.rampInterval = setInterval(() => {
-      if (this.workers.length >= Math.max(2, os.cpus().length * 2)) {
+      if (this.getWorkersByMode('ramp').length >= Math.max(2, os.cpus().length * 2)) {
         clearInterval(this.rampInterval);
         this.rampInterval = null;
         return;
       }
 
       burst += 15000;
-      this.spawnWorker(burst);
+      this.spawnWorker('ramp', burst);
       this.logger.warn(
-        { event: 'chaos.ramp.step', workerCount: this.workers.length, burst },
+        { event: 'chaos.ramp.step', workerCount: this.getWorkersByMode('ramp').length, burst },
         'Gradual CPU ramp increased'
       );
     }, 5000);
@@ -78,25 +86,95 @@ class ChaosManager {
     return this.getStatus();
   }
 
-  remediateAll() {
+  deactivateSaturation() {
+    if (!this.state.saturation) {
+      return this.getStatus();
+    }
+
+    const workerCount = this.stopWorkersByMode('saturation');
+    this.state.saturation = false;
+    this.state.lastActionAt = new Date().toISOString();
+    this.gauges.chaosModeGauge.set({ mode: 'saturation' }, 0);
+
+    this.logger.info(
+      { event: 'chaos.deactivate', mode: 'saturation', terminatedWorkers: workerCount },
+      'Immediate CPU saturation chaos deactivated'
+    );
+    return this.getStatus();
+  }
+
+  deactivateRamp() {
     if (this.rampInterval) {
       clearInterval(this.rampInterval);
       this.rampInterval = null;
     }
 
-    this.workers.forEach((worker) => worker.terminate());
-    this.workers = [];
+    if (!this.state.ramp) {
+      return this.getStatus();
+    }
 
-    this.state.saturation = false;
+    const workerCount = this.stopWorkersByMode('ramp');
     this.state.ramp = false;
+    this.state.lastActionAt = new Date().toISOString();
+    this.gauges.chaosModeGauge.set({ mode: 'ramp' }, 0);
+
+    this.logger.info(
+      { event: 'chaos.deactivate', mode: 'ramp', terminatedWorkers: workerCount },
+      'Gradual CPU ramp chaos deactivated'
+    );
+    return this.getStatus();
+  }
+
+  deactivateErrors() {
+    if (!this.state.errorInjection) {
+      return this.getStatus();
+    }
+
     this.state.errorInjection = false;
-    this.state.workerCount = 0;
+    this.state.lastActionAt = new Date().toISOString();
+    this.gauges.chaosModeGauge.set({ mode: 'errors' }, 0);
+    this.logger.info({ event: 'chaos.deactivate', mode: 'errors' }, 'Error injection chaos deactivated');
+    return this.getStatus();
+  }
+
+  activateMode(mode) {
+    if (mode === 'saturation') {
+      return this.activateSaturation();
+    }
+
+    if (mode === 'ramp') {
+      return this.activateRamp();
+    }
+
+    if (mode === 'errors') {
+      return this.activateErrors();
+    }
+
+    throw new Error(`Unsupported chaos mode: ${mode}`);
+  }
+
+  deactivateMode(mode) {
+    if (mode === 'saturation') {
+      return this.deactivateSaturation();
+    }
+
+    if (mode === 'ramp') {
+      return this.deactivateRamp();
+    }
+
+    if (mode === 'errors') {
+      return this.deactivateErrors();
+    }
+
+    throw new Error(`Unsupported chaos mode: ${mode}`);
+  }
+
+  remediateAll() {
+    this.deactivateSaturation();
+    this.deactivateRamp();
+    this.deactivateErrors();
     this.state.remediationCount += 1;
     this.state.lastActionAt = new Date().toISOString();
-
-    this.gauges.chaosModeGauge.set({ mode: 'saturation' }, 0);
-    this.gauges.chaosModeGauge.set({ mode: 'ramp' }, 0);
-    this.gauges.chaosModeGauge.set({ mode: 'errors' }, 0);
 
     this.logger.info({ event: 'chaos.remediate', remediationCount: this.state.remediationCount }, 'All chaos conditions remediated');
     return this.getStatus();
@@ -110,16 +188,30 @@ class ChaosManager {
     this.remediateAll();
   }
 
-  spawnWorker(burst) {
+  getWorkersByMode(mode) {
+    return this.workers.filter((entry) => entry.mode === mode);
+  }
+
+  stopWorkersByMode(mode) {
+    const matchingWorkers = this.getWorkersByMode(mode);
+    matchingWorkers.forEach(({ worker }) => worker.terminate());
+    this.workers = this.workers.filter((entry) => entry.mode !== mode);
+    this.state.workerCount = this.workers.length;
+    return matchingWorkers.length;
+  }
+
+  spawnWorker(mode, burst) {
     const worker = new Worker(path.join(__dirname, 'chaosWorker.js'), {
       workerData: { burst }
     });
+    const workerEntry = { worker, mode };
 
     worker.on('message', (message) => {
       if (message.type === 'heartbeat') {
         this.logger.warn(
           {
             event: 'chaos.worker.heartbeat',
+            mode,
             iterations: message.iterations,
             burst,
             workerCount: this.workers.length
@@ -130,16 +222,16 @@ class ChaosManager {
     });
 
     worker.on('error', (error) => {
-      this.logger.error({ event: 'chaos.worker.error', error: error.message }, 'Chaos worker crashed');
+      this.logger.error({ event: 'chaos.worker.error', mode, error: error.message }, 'Chaos worker crashed');
     });
 
     worker.on('exit', (code) => {
-      this.workers = this.workers.filter((entry) => entry !== worker);
+      this.workers = this.workers.filter((entry) => entry.worker !== worker);
       this.state.workerCount = this.workers.length;
-      this.logger.warn({ event: 'chaos.worker.exit', code, workerCount: this.workers.length }, 'Chaos worker exited');
+      this.logger.warn({ event: 'chaos.worker.exit', mode, code, workerCount: this.workers.length }, 'Chaos worker exited');
     });
 
-    this.workers.push(worker);
+    this.workers.push(workerEntry);
     this.state.workerCount = this.workers.length;
   }
 }

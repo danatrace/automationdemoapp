@@ -49,3 +49,17 @@ kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
 - Server logs are JSON and include request IDs, auth events, transaction events, chaos events, and remediation events.
 - Browser actions are posted back to the server through `/api/client-logs` so UI steps are traceable in one stream.
 - `readyz` intentionally reports degraded state while destructive chaos modes are active to help demo remediation workflows.
+
+## Chaos REST API
+
+- `GET /api/chaos/status`: current aggregated chaos state.
+- `GET /api/chaos/modes`: list of supported chaos modes and active state.
+- `POST /api/chaos/saturation`: activate immediate CPU saturation.
+- `DELETE /api/chaos/saturation`: deactivate immediate CPU saturation.
+- `POST /api/chaos/ramp`: activate slow CPU ramp.
+- `DELETE /api/chaos/ramp`: deactivate slow CPU ramp.
+- `POST /api/chaos/errors`: activate intermittent error injection.
+- `DELETE /api/chaos/errors`: deactivate intermittent error injection.
+- `POST /api/chaos/:mode`: generic activation endpoint where `:mode` is `saturation`, `ramp`, or `errors`.
+- `DELETE /api/chaos/:mode`: generic deactivation endpoint.
+- `POST /api/chaos/remediate`: deactivate all chaos modes at once.

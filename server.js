@@ -99,6 +99,18 @@ function injectChaosErrors(req, res, next) {
   return res.status(500).json({ error: 'Chaos mode injected an application error' });
 }
 
+function parseChaosMode(req, res, next) {
+  const mode = req.params.mode;
+
+  if (!chaosManager.isValidMode(mode)) {
+    req.log.warn({ event: 'chaos.mode.invalid', mode }, 'Unsupported chaos mode requested');
+    return res.status(404).json({ error: 'Unsupported chaos mode' });
+  }
+
+  req.chaosMode = mode;
+  return next();
+}
+
 app.get('/healthz', (req, res) => {
   req.log.info({ event: 'probe.health' }, 'Health probe succeeded');
   res.json({ status: 'ok' });
@@ -234,9 +246,30 @@ app.get('/api/chaos/status', requireAuth, (req, res) => {
   res.json(status);
 });
 
+app.get('/api/chaos/modes', requireAuth, (req, res) => {
+  const modes = ChaosManager.VALID_MODES.map((mode) => ({
+    mode,
+    active:
+      mode === 'saturation'
+        ? chaosManager.getStatus().saturation
+        : mode === 'ramp'
+          ? chaosManager.getStatus().ramp
+          : chaosManager.getStatus().errorInjection
+  }));
+
+  req.log.info({ event: 'chaos.modes.list', userId: req.user.id, modes }, 'Chaos modes returned');
+  res.json({ modes, status: chaosManager.getStatus() });
+});
+
 app.post('/api/chaos/saturation', requireAuth, (req, res) => {
   const status = chaosManager.activateSaturation();
   req.log.warn({ event: 'chaos.saturation.triggered', userId: req.user.id, status }, 'Immediate saturation chaos triggered');
+  res.json(status);
+});
+
+app.delete('/api/chaos/saturation', requireAuth, (req, res) => {
+  const status = chaosManager.deactivateSaturation();
+  req.log.info({ event: 'chaos.saturation.cleared', userId: req.user.id, status }, 'Immediate saturation chaos deactivated');
   res.json(status);
 });
 
@@ -246,9 +279,21 @@ app.post('/api/chaos/ramp', requireAuth, (req, res) => {
   res.json(status);
 });
 
+app.delete('/api/chaos/ramp', requireAuth, (req, res) => {
+  const status = chaosManager.deactivateRamp();
+  req.log.info({ event: 'chaos.ramp.cleared', userId: req.user.id, status }, 'Slow ramp chaos deactivated');
+  res.json(status);
+});
+
 app.post('/api/chaos/errors', requireAuth, (req, res) => {
   const status = chaosManager.activateErrors();
   req.log.error({ event: 'chaos.errors.triggered', userId: req.user.id, status }, 'Error injection chaos triggered');
+  res.json(status);
+});
+
+app.delete('/api/chaos/errors', requireAuth, (req, res) => {
+  const status = chaosManager.deactivateErrors();
+  req.log.info({ event: 'chaos.errors.cleared', userId: req.user.id, status }, 'Error injection chaos deactivated');
   res.json(status);
 });
 
@@ -256,6 +301,24 @@ app.post('/api/chaos/remediate', requireAuth, (req, res) => {
   const status = chaosManager.remediateAll();
   req.log.info({ event: 'chaos.remediation.triggered', userId: req.user.id, status }, 'Chaos remediation triggered');
   res.json(status);
+});
+
+app.post('/api/chaos/:mode', requireAuth, parseChaosMode, (req, res) => {
+  const status = chaosManager.activateMode(req.chaosMode);
+  req.log.warn(
+    { event: 'chaos.mode.activated', userId: req.user.id, mode: req.chaosMode, status },
+    'Chaos mode activated through REST API'
+  );
+  res.json({ mode: req.chaosMode, action: 'activated', status });
+});
+
+app.delete('/api/chaos/:mode', requireAuth, parseChaosMode, (req, res) => {
+  const status = chaosManager.deactivateMode(req.chaosMode);
+  req.log.info(
+    { event: 'chaos.mode.deactivated', userId: req.user.id, mode: req.chaosMode, status },
+    'Chaos mode deactivated through REST API'
+  );
+  res.json({ mode: req.chaosMode, action: 'deactivated', status });
 });
 
 app.use(express.static('public'));

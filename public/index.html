@@ -127,24 +127,32 @@
               <p class="eyebrow">Disaster Activation</p>
               <h2>Chaos and remediation</h2>
             </div>
-            <button id="remediateButton" class="secondary">Remediate all</button>
           </div>
 
           <div class="chaos-grid">
             <article class="panel-card chaos-card">
               <h3>Fast CPU saturation</h3>
               <p>Spawns multiple CPU-burning workers immediately to saturate cluster CPU fast.</p>
-              <button id="saturationButton" class="danger">Activate saturation</button>
+              <div class="chaos-button-group">
+                <button id="saturationActivateButton" class="danger chaos-activate-btn">Activate</button>
+                <button id="saturationDeactivateButton" class="secondary chaos-deactivate-btn hidden">Deactivate</button>
+              </div>
             </article>
             <article class="panel-card chaos-card">
               <h3>Slow CPU ramp</h3>
               <p>Gradually adds more worker load over time to simulate creeping CPU pressure.</p>
-              <button id="rampButton" class="warning">Activate ramp</button>
+              <div class="chaos-button-group">
+                <button id="rampActivateButton" class="warning chaos-activate-btn">Activate</button>
+                <button id="rampDeactivateButton" class="secondary chaos-deactivate-btn hidden">Deactivate</button>
+              </div>
             </article>
             <article class="panel-card chaos-card">
               <h3>Error injection</h3>
               <p>Forces application endpoints to intermittently fail with server errors.</p>
-              <button id="errorsButton" class="warning">Activate errors</button>
+              <div class="chaos-button-group">
+                <button id="errorsActivateButton" class="warning chaos-activate-btn">Activate</button>
+                <button id="errorsDeactivateButton" class="secondary chaos-deactivate-btn hidden">Deactivate</button>
+              </div>
             </article>
           </div>
 

@@ -48,12 +48,12 @@ Demo login:
 ## Container build
 
 ```bash
-docker build -t ghcr.io/danatrace/automationdemoapp:latest .
+docker build -t automationdemoapp:latest .
 export SESSION_SECRET="$(openssl rand -hex 32)"
 docker run --rm -p 3000:3000 \
 	-e NODE_ENV=production \
 	-e SESSION_SECRET="$SESSION_SECRET" \
-	ghcr.io/danatrace/automationdemoapp:latest
+	automationdemoapp:latest
 ```
 
 The container image runs with `NODE_ENV=production`, so `SESSION_SECRET` must be set.
@@ -65,9 +65,13 @@ The container image runs with `NODE_ENV=production`, so `SESSION_SECRET` must be
 	Option A: push to your own registry and update the image value.
 
 	```bash
-	docker build -t <your-registry>/automationdemoapp:latest .
-	docker push <your-registry>/automationdemoapp:latest
+	docker build -t ghcr.io/<your-github-username>/automationdemoapp:latest .
+	echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-username> --password-stdin
+	docker push ghcr.io/<your-github-username>/automationdemoapp:latest
 	```
+
+	Your token must include `write:packages` (and usually `read:packages`).
+	You cannot push to `ghcr.io/danatrace/...` unless that org/user granted you permission.
 
 	Option B (local cluster): build locally and load into the cluster runtime.
 

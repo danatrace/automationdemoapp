@@ -39,7 +39,7 @@ spec:
           # Replace this with your own image before applying.
           # See the README Kubernetes deploy section for build and push instructions.
           image: YOUR_REGISTRY/automationdemoapp:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

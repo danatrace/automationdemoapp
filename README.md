@@ -103,15 +103,34 @@ sed -i 's|YOUR_REGISTRY/automationdemoapp:latest|automationdemoapp:local|' k8s/b
 
 Also set a real `SESSION_SECRET` value in `k8s/banking-observability-demo.yaml` (replace `replace-with-a-long-random-secret`).
 
-### Step 3 — apply and verify
+### Step 3 — generate ingress from template
+
+This repo follows the same ingress-template flow as the reference easytravel manifests.
+
+```bash
+export DOMAIN=banking.localtest.me
+sed 's~domain.placeholder~'"$DOMAIN"'~' k8s/ingress.template > k8s/ingress-gen.yaml
+```
+
+The generated ingress routes `http://$DOMAIN/` to the `banking-observability-demo` service.
+
+### Step 4 — apply and verify
 
 ```bash
 kubectl apply -f k8s/banking-observability-demo.yaml
+kubectl -n banking-demo apply -f k8s/ingress-gen.yaml
 kubectl -n banking-demo rollout status deployment/banking-observability-demo
-kubectl -n banking-demo port-forward svc/banking-observability-demo 3000:80
+kubectl -n banking-demo get ingress
 ```
 
-Open `http://localhost:3000`.
+Open `http://<your-domain>/` from ingress output.
+
+### Optional — one-command deploy helper
+
+```bash
+chmod +x k8s/deploy-banking-demo.sh
+DOMAIN=banking.localtest.me ./k8s/deploy-banking-demo.sh
+```
 
 If rollout does not complete, check:
 

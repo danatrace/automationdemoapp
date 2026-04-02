@@ -12,6 +12,8 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-USER node
+# Use numeric UID so Kubernetes runAsNonRoot can verify the user is non-root.
+# UID 1000 is the 'node' user in node:alpine images.
+USER 1000
 
 CMD ["npm", "start"]
